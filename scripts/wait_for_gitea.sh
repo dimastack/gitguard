@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# By default inside docker-compose network it's gitea:3000
-# Locally override with: GITEA_URL=http://localhost:3000 ./scripts/wait_for_gitea.sh
-GITEA_URL="${GITEA_URL:-http://gitea:3000}"
+# By default inside docker-compose network it's gitea:3000, but from CI runner it's localhost:3000
+# Locally override with: GITEA_URL=http://localhost:3000
+GITEA_URL="${GITEA_URL:-http://localhost:3000}"
 MAX_RETRIES="${MAX_RETRIES:-90}"   # up to 180s
 SLEEP_INTERVAL="${SLEEP_INTERVAL:-2}"
 
