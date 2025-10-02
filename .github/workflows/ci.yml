@@ -57,6 +57,7 @@ jobs:
           allure generate ./allure-results -o ./allure-report --clean || true
 
       - name: Upload Pages artifact
+        if: always()
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./allure-report
@@ -66,6 +67,22 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download allure results
+        if: always()
+        uses: actions/download-artifact@v4
+        with:
+          name: allure-results
+          path: ./allure-results
+
+      - name: Generate Allure Report
+        if: always()
+        run: |
+          pip install allure-pytest
+          allure generate ./allure-results -o ./allure-report --clean || true
 
       - name: Deploy to GitHub Pages
         if: always()
