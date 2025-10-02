@@ -31,14 +31,10 @@ jobs:
       - name: Run tests inside tester
         continue-on-error: true
         run: |
+          # clean allure-results inside container before running tests
+          docker exec tester rm -rf /app/allure-results || true
+          docker exec tester mkdir -p /app/allure-results
           docker exec tester pytest -v -n auto --alluredir=/app/allure-results tests || true
-
-      - name: Debug inside container
-        if: always()
-        run: |
-          echo "[DEBUG] Inside tester container:"
-          docker exec tester ls -la /app || true
-          docker exec tester ls -la /app/allure-results || true
 
       - name: Copy allure results
         if: always()
@@ -49,10 +45,10 @@ jobs:
           sudo chown -R $USER:$USER ./allure-results || true
           sudo chmod -R 777 ./allure-results || true
 
-      - name: Debug copied results
+      - name: Debug results on host
         if: always()
         run: |
-          echo "[DEBUG] On host after docker cp:"
+          echo "[DEBUG] On host after tests:"
           ls -la ./allure-results || true
 
       - name: Upload allure results
@@ -76,6 +72,12 @@ jobs:
         with:
           name: allure-results
           path: ./allure-results
+
+      - name: Debug downloaded results
+        if: always()
+        run: |
+          echo "[DEBUG] In deploy-report after download:"
+          ls -la ./allure-results || true
 
       - name: Generate Allure Report
         if: always()
