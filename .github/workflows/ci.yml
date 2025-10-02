@@ -22,7 +22,7 @@ jobs:
           docker compose build
           docker compose up -d gitea
           echo "[CI] Waiting for Gitea to become ready..."
-          bash scripts/wait_for_gitea.sh gitea:3000
+          docker exec tester bash /app/scripts/wait_for_gitea.sh
           docker compose up -d tester
 
       - name: Run tests inside tester
