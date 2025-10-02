@@ -55,7 +55,7 @@ services:
       - ./allure-results:/app/allure-results
       - ./ssh_keys:/root/.ssh
     networks:
-      gitnet
+      - gitnet
 
 networks:
   gitnet:
