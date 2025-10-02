@@ -70,10 +70,14 @@ jobs:
           echo "[DEBUG] In deploy-report after download:"
           ls -la ./allure-results || true
 
+      - name: Install Allure CLI
+        run: |
+          curl -o allure.tgz -L https://github.com/allure-framework/allure2/releases/latest/download/allure-2.30.0.tgz
+          sudo tar -zxvf allure.tgz -C /opt/
+          sudo ln -s /opt/allure-2.30.0/bin/allure /usr/local/bin/allure
+    
       - name: Generate Allure Report
         run: |
-          sudo apt-get update
-          sudo apt-get install -y allure
           allure generate ./allure-results -o ./allure-report --clean
 
       - name: Upload Pages artifact
