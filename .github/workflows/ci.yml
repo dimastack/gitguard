@@ -38,8 +38,10 @@ jobs:
       - name: Copy allure results
         if: always()
         run: |
+          rm -rf ./allure-results || true
           mkdir -p ./allure-results
-          docker cp tester:/app/allure-results/. ./allure-results
+          docker cp tester:/app/allure-results/. ./allure-results || true
+          sudo chmod -R 777 ./allure-results
 
       - name: Upload allure results
         if: always()
