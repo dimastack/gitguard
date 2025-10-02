@@ -37,7 +37,9 @@ jobs:
 
       - name: Copy allure results
         if: always()
-        run: docker cp tester:/app/allure-results ./allure-results
+        run: |
+          mkdir -p ./allure-results
+          docker cp tester:/app/allure-results/. ./allure-results
 
       - name: Upload allure results
         if: always()
