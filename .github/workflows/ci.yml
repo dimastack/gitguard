@@ -14,7 +14,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -32,7 +31,6 @@ jobs:
       - name: Run tests inside tester
         continue-on-error: true
         run: |
-          set +e
           docker exec tester pytest -v -n auto --alluredir=/app/allure-results tests || true
 
       - name: Copy allure results
@@ -50,24 +48,12 @@ jobs:
           name: allure-results
           path: ./allure-results
 
-      - name: Generate Allure Report
-        if: always()
-        run: |
-          pip install allure-pytest
-          allure generate ./allure-results -o ./allure-report --clean || true
-
-      - name: Upload Pages artifact
-        if: always()
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ./allure-report
-
   deploy-report:
     needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-    steps:
 
+    steps:
       - name: Checkout
         uses: actions/checkout@v4
 
