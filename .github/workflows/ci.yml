@@ -33,6 +33,13 @@ jobs:
         run: |
           docker exec tester pytest -v -n auto --alluredir=/app/allure-results tests || true
 
+      - name: Debug inside container
+        if: always()
+        run: |
+          echo "[DEBUG] Inside tester container:"
+          docker exec tester ls -la /app || true
+          docker exec tester ls -la /app/allure-results || true
+
       - name: Copy allure results
         if: always()
         run: |
@@ -41,6 +48,12 @@ jobs:
           docker cp tester:/app/allure-results/. ./allure-results || true
           sudo chown -R $USER:$USER ./allure-results || true
           sudo chmod -R 777 ./allure-results || true
+
+      - name: Debug copied results
+        if: always()
+        run: |
+          echo "[DEBUG] On host after docker cp:"
+          ls -la ./allure-results || true
 
       - name: Upload allure results
         if: always()
