@@ -1,8 +1,8 @@
 name: CI
 
 on:
-  pull_request:
-    branches: [main]
+  push:
+    branches: [develop]
 
 permissions:
   contents: read
@@ -36,10 +36,11 @@ jobs:
       - name: Copy allure results
         if: always()
         run: |
-          rm -rf ./allure-results || true
+          sudo rm -rf ./allure-results || true
           mkdir -p ./allure-results
           docker cp tester:/app/allure-results/. ./allure-results || true
-          sudo chmod -R 777 ./allure-results
+          sudo chown -R $USER:$USER ./allure-results || true
+          sudo chmod -R 777 ./allure-results || true
 
       - name: Upload allure results
         if: always()
@@ -51,7 +52,6 @@ jobs:
   deploy-report:
     needs: test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
 
     steps:
       - name: Checkout
@@ -70,6 +70,13 @@ jobs:
           pip install allure-pytest
           allure generate ./allure-results -o ./allure-report --clean || true
 
+      - name: Upload Pages artifact
+        if: always()
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./allure-report
+
       - name: Deploy to GitHub Pages
         if: always()
+        id: deployment
         uses: actions/deploy-pages@v4
