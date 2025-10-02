@@ -1,7 +1,7 @@
 import os
 import pytest
 
-from clients.git_client import GitClient
+from gitguard.clients.git_client import GitClient
 
 
 @pytest.mark.e2e

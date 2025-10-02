@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import logging
 import os
+
 from typing import Any, Dict, Optional
 
-from clients.http_client import HttpClient, HttpResult
+from gitguard.clients.http_client import HttpClient, HttpResult
 
 logger = logging.getLogger("gitguard")
 
