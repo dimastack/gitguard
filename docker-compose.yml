@@ -12,7 +12,8 @@ services:
       GITEA__database__PATH: /data/gitea/gitea.db
       GITEA__server__DOMAIN: gitea
       GITEA__server__ROOT_URL: http://gitea:3000/
-      GITEA__server__SSH_PORT: 22
+      GITEA__server__SSH_PORT: 2222
+      GITEA__server__SSH_LISTEN_PORT: 2222
       GITEA__server__DISABLE_SSH: false
       GITEA__server__START_SSH_SERVER: true
       GITEA__security__INSTALL_LOCK: true
@@ -27,7 +28,7 @@ services:
       - ./ssh_keys:/etc/ssh_keys
     ports:
       - "3000:3000"
-      - "2222:22" 
+      - "2222:2222" 
       - "9418:9418"   # git:// protocol
     networks:
       gitnet:
@@ -44,7 +45,7 @@ services:
     environment:
       GITEA_BASE_URL: http://gitea:3000
       GITEA_SSH_HOST: gitea
-      GITEA_SSH_PORT: 22
+      GITEA_SSH_PORT: 2222
       GITEA_ADMIN_USER: admin
       GITEA_ADMIN_PASSWORD: admin123
       GITEA_ADMIN_EMAIL: admin@gitea.local
