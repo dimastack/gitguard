@@ -72,9 +72,10 @@ jobs:
 
       - name: Install Allure CLI
         run: |
-          curl -o allure.tgz -L https://github.com/allure-framework/allure2/releases/latest/download/allure-2.30.0.tgz
+          curl -sL https://github.com/allure-framework/allure2/releases/download/2.30.0/allure-2.30.0.tgz -o allure.tgz
           sudo tar -zxvf allure.tgz -C /opt/
           sudo ln -s /opt/allure-2.30.0/bin/allure /usr/local/bin/allure
+          allure --version
     
       - name: Generate Allure Report
         run: |
