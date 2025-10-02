@@ -36,15 +36,6 @@ jobs:
           docker exec tester mkdir -p /app/allure-results
           docker exec tester pytest -v -n auto --alluredir=/app/allure-results tests || true
 
-      - name: Copy allure results
-        if: always()
-        run: |
-          sudo rm -rf ./allure-results || true
-          mkdir -p ./allure-results
-          docker cp tester:/app/allure-results/. ./allure-results || true
-          sudo chown -R $USER:$USER ./allure-results || true
-          sudo chmod -R 777 ./allure-results || true
-
       - name: Debug results on host
         if: always()
         run: |
