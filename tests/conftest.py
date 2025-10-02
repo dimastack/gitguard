@@ -1,7 +1,7 @@
 import os
 import pytest
 
-from clients.http_gitea_client import GiteaHttpClient
+from gitguard.clients.http_gitea_client import GiteaHttpClient
 
 
 @pytest.fixture(scope="session")
