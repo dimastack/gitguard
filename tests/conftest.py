@@ -16,6 +16,6 @@ def gitea_client() -> GiteaHttpClient:
     client = GiteaHttpClient(base_url=base_url, token=token)
     # quick smoke-check
     health = client.health_check()
-    assert health.ok(), f"Gitea server not reachable at {base_url}, status={health.status}"
+    assert health.ok(), f"Gitea server not reachable at {base_url}, status={health.status_code}"
 
     return client
