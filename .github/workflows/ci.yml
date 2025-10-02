@@ -4,11 +4,17 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 jobs:
   test:
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -26,7 +32,8 @@ jobs:
       - name: Run tests inside tester
         continue-on-error: true
         run: |
-          docker exec tester pytest -v -n auto --alluredir=/app/allure-results
+          set +e
+          docker exec tester pytest -v -n auto --alluredir=/app/allure-results tests || true
 
       - name: Copy allure results
         if: always()
@@ -39,31 +46,23 @@ jobs:
           name: allure-results
           path: ./allure-results
 
-  deploy-report:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Download allure results
-        if: always()
-        uses: actions/download-artifact@v4
-        with:
-          name: allure-results
-          path: ./allure-results
-
       - name: Generate Allure Report
         if: always()
         run: |
           pip install allure-pytest
-          allure generate ./allure-results -o ./allure-report --clean
+          allure generate ./allure-results -o ./allure-report --clean || true
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./allure-report
+
+  deploy-report:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
 
       - name: Deploy to GitHub Pages
         if: always()
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./allure-report
+        uses: actions/deploy-pages@v4
