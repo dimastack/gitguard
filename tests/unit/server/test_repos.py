@@ -1,5 +1,5 @@
 import pytest
-from clients.http_gitea_client import GiteaHttpClient
+from gitguard.clients.http_gitea_client import GiteaHttpClient
 
 @pytest.mark.unit
 def test_create_repo_success(mocker):

@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import logging
 import time
+import requests
+
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
-import requests
 
 try:
     import allure
