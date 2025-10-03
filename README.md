@@ -24,18 +24,21 @@ implementation would be, and also describe the requirements of the system that w
 these tests in a continuous integration manner.
 
 ## Preparation and thoughts
-Home solution:
+Homemade solution:
+
 Initially, I had another plan: I wished to run Git client on local VM (CI runner) and run Git server (Gitea) inside the Docker. This way on CI I planned to use different runner OS's to run
 the tests via matrix 'OSs/git client versions/protocols'. But in such case I was made to work via
 localhost which technically break task requirements.
 So in the result I decided to orginize infrastructure as 2 Docker containers connected via network in bridge mode - means 2 different hosts with 2 different IPs.
 I tried to complete the task as complex solution with unit tests, e2e, clients, infrastructure.
+
 Real life solution:
+
 In case I need to test Git clients and server in reality, I'd preffered next way:
-1) Separate dev teams works on each version of Git client (per OS) and one works with server code.
-2) All the teams write unit tests (I added them here just to show they should be stage 0)
+1) Separate dev teams works on each version of Git client (per OS) and one team works with server code.
+2) All the teams write unit tests (I added them here just to show they should be absolutely required as stage 0)
 3) We deploy server code on test environment somewhere in eg AWS.
-4) I use let's say Github Actions or Gitlab CI to run tests from Runner VM with different OS's with installed python and git client in matrix against Git server running on AWS.
+4) I use let's say Github Actions or Gitlab CI to run tests from Runner VM with different OS's with installed python and git clients in the matrix against Git server running on AWS.
 
 ## Why two-container architecture
 We must test communication between **two separate hosts** — a Git client and a Git server — to match the assignment requirements. Running both roles in different Docker containers (`tester` and `gitea`) gives:
@@ -58,64 +61,121 @@ We must test communication between **two separate hosts** — a Git client and a
             |-- ./allure-results <------------------------------|
 ```
 
+## Features
+
+- **Docker Compose setup** with `gitea` and `tester` services
+- **Pytest integration** with Allure for structured reports
+- **GitHub Actions CI** workflow:
+  - Runs tests inside the `tester` container
+  - Collects and uploads Allure results as artifacts
+  - Publishes the Allure Report to GitHub Pages
+
 ## Project structure (important)
 ```
 gitguard/
-├─ clients/
-│  ├─ git_client.py
-│  ├─ http_client.py
-│  ├─ http_gitea_client.py
-│  └─ ssh_client.py
+├─ .github/
+│  └─ workflows/
+│     └─ ci.yml
+├─ artifacts/
 ├─ docker/
-│  └─ tester/Dockerfile
+│  └─ tester/
+│     └─ Dockerfile
 ├─ scripts/
-│  ├─ wait_for_gitea.sh
-│  └─ init_gitea.sh
+│  ├─ init_gitea.sh
+│  ├─ init_ssh_keys.sh
+│  └─ wait_for_gitea.sh
+├─ src/
+│  └─ gitguard/
+│     ├─ clients/
+│     │  ├─ __init__.py
+│     │  ├─ git_client.py
+│     │  ├─ http_client.py
+│     │  ├─ http_gitea_client.py
+│     │  └─ ssh_client.py
+│     └─ __init__.py
 ├─ tests/
-│  ├─ conftest.py
-│  └─ e2e/
-│     └─ api/
-│        ├─ cli/
-│        └─ server/
+│  ├─ e2e/
+│  │  ├─ api/
+│  │  │  ├─ cli/
+│  │  │  │  ├─ conftest.py
+│  │  │  │  ├─ test_branching.py
+│  │  │  │  ├─ test_clone.py
+│  │  │  │  ├─ test_full_flow.py
+│  │  │  │  ├─ test_init_commit.py
+│  │  │  │  ├─ test_log_diff_reset_stash.py
+│  │  │  │  ├─ test_merge_rebase.py
+│  │  │  │  ├─ test_push_pull.py
+│  │  │  │  ├─ test_remote_config.py
+│  │  │  │  ├─ test_status_fetch.py
+│  │  │  │  └─ test_tags.py
+│  │  │  └─ server/
+│  │  │     ├─ conftest.py
+│  │  │     ├─ test_admin_e2e.py
+│  │  │     ├─ test_health_misc_e2e.py
+│  │  │     ├─ test_orgs_e2e.py
+│  │  │     ├─ test_repos_e2e.py
+│  │  │     └─ test_users_e2e.py
+│  │  └─ ui/
+│  │     └─ conftest.py
+│  ├─ unit/
+│  │  ├─ cli/
+│  │  │  ├─ test_git_general.py
+│  │  │  ├─ test_git_pull.py
+│  │  │  └─ test_git_push.py
+│  │  └─ server/
+│  │     ├─ test_admin.py
+│  │     ├─ test_misc.py
+│  │     ├─ test_orgs.py
+│  │     ├─ test_repos.py
+│  │     └─ test_users.py
+│  └─ conftest.py
+├─ .gitignore
 ├─ docker-compose.yml
+├─ Makefile
 ├─ pytest.ini
-├─ requirements.txt
-└─ .github/workflows/ci.yml
+├─ README.md
+└─ requirements.txt
+
 ```
 
 ## How tests are organized
 - `tests/unit` — unit tests
 - `tests/e2e/api/cli` — e2e scenarios using `GitClient` (clone/commit/push/pull/branch/status/fetch)
 - `tests/e2e/api/server` — e2e scenarios using `GiteaHttpClient` (users, repos, orgs, admin)
-- `tests/e2e/ui` — (future) UI tests (Playwright/Selenium)
+- `tests/e2e/ui` — (future) UI tests (Playwright)
 
 ## Quickstart (local)
 1. Install Docker & docker-compose.
-2. Ensure `configs/local.env` contains any needed envs (or set env vars).
-3. Build tester image:
+2. Build tester image from docker/tester/Dockerfile:
    ```bash
-   docker build -t gitguard/tester -f docker/tester/Dockerfile .
+   docker compose build --no-cache tester
    ```
-4. Start stack:
+3. Start stack:
    ```bash
-   docker-compose up -d --build
-   ./scripts/wait_for_gitea.sh
+   docker compose up -d gitea
+   bash scripts/wait_for_gitea.sh
+   docker compose up -d tester
    docker exec tester bash -lc "/app/scripts/init_gitea.sh"
    ```
-5. Run tests inside tester:
+4. Run tests inside tester:
    ```bash
    docker exec tester pytest -v --alluredir=/app/allure-results tests/unit
    docker exec tester pytest -v --alluredir=/app/allure-results tests/e2e/api
    ```
-6. Generate Allure report:
+5. Generate Allure report:
    ```bash
    allure generate allure-results -o allure-report --clean
    allure open allure-report
    ```
 
-## CI (GitHub Actions)
-- The workflow builds `tester`, starts services (docker-compose), waits for Gitea, runs `init_gitea.sh` inside `tester`, runs unit → e2e/api → (optional) e2e/ui, and uploads Allure results as artifacts.
-- Add `GITEA_ADMIN_TOKEN` to repository secrets for API initialization.
+## CI — high level
+![CI overview](./artifacts/images/ci_workflow.png)
+- Workflow builds tester image, brings up gitea first, waits for readiness (via scripts/wait_for_gitea.sh), then starts tester.
+- Tests run inside tester via docker exec.
+- Allure results are collected from /app/allure-results and uploaded as artifacts; an additional job generates Allure HTML and publishes it to GitHub Pages.
+![Allure reporting - ](./artifacts/images/allure.png)
+- The test step is continue-on-error (or tolerant) and artifact + report steps are if: always() — this ensures we always publish report even if tests fail.
+- Matrix: CI can run multiple matrix entries (different git versions) — for containerized runs this is typically implemented by building tester images with different build args/tags.
 
 ## What was tested first (MVP)
 - Core Git operations (clone, init, add, commit, push, pull, fetch, branch, checkout, status).
@@ -128,19 +188,31 @@ gitguard/
 - SSH keys are generated at start and shared between tester and gitea (via scripts/compose). This is implemented as a best-effort in `init_gitea.sh` and docker-compose mounts.
 
 ## Second phase (roadmap)
-1. **Expand test coverage**: add edge cases, large-file pushes, submodules.
+1. **Expand test coverage**: add edge cases, parallel pushes, large-file pushes, submodules.
 2. **Performance & stress**: scripted parallel pushes/fetches, large repos, measure latencies.
 3. **UI tests**: Playwright tests for login / repo creation / web UI flows.
 4. **Security tests**: RBAC, token expiry, CSRF, input validation fuzzing.
 5. **Chaos testing**: network partition, disk I/O throttle, restart gitea during push.
 6. **Matrix builds**: add multiple tester images (different Git versions) and runner targets (Linux/macOS/Windows).
 
-## CI runner / infra requirements
+## Infra requirements
 - Docker & docker-compose available (for running services).
 - Secrets access for `GITEA_ADMIN_TOKEN`.
 - Optionally Allure CLI installed to publish HTML report.
-- Runners for UI tests require browser support (Playwright).
+- Runners for UI tests don't require browser support as will be executed in --headless (Playwright).
 
-## Notes & troubleshooting
-- If tests fail due to Gitea initial setup, check `allure-results` and `artifacts/git-client-*.log`.
-- If SSH fails — verify keys present and that `GIT_SSH_COMMAND` is configured to bypass host checking.
+## Troubleshooting (common problems & fixes)
+
+- Gitea HTTP not responding (wait_for_gitea.sh times out)
+Check docker logs gitea.
+Ensure container had time for initialization (DB migrations). Increase retries in scripts/wait_for_gitea.sh.
+- SSH port conflict (listen tcp :22: bind: address already in use)
+Host may already have SSH on port 22. Use a different host port mapping (compose uses 2222:2222 recommended). Verify GITEA__server__SSH_PORT env in compose.
+- ModuleNotFoundError: No module named 'clients' inside tester
+Ensure PYTHONPATH=/app is exported in tester env and tests volume mounting is correct. requirements.txt must be installed in the tester image.
+- Permissions when copying Allure artifacts on CI
+Fix by making copied dir world-writable before upload: sudo chown -R $USER:$USER ./allure-results && sudo chmod -R 777 ./allure-results (CI runner).
+- allure: command not found when generating report on GitHub runner
+Install Allure CLI explicitly in the job (download exact release releases/download/<version>/allure-<version>.tgz) and symlink to /usr/local/bin/allure.
+- If Allure report folder missing for Pages upload
+Make sure allure generate ran successfully and the directory exists before upload-pages-artifact. Use if: always() and || true for resilience and check logs.
