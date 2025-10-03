@@ -172,7 +172,7 @@ gitguard/
 ![CI overview](./artifacts/images/ci_workflow.png)
 - Workflow builds tester image, brings up gitea first, waits for readiness (via scripts/wait_for_gitea.sh), then starts tester.
 - Tests run inside tester via docker exec.
-- Allure results are collected from /app/allure-results and uploaded as artifacts; an additional job generates Allure HTML and publishes it to GitHub Pages - [![Allure Report on Github Pages]](https://dimastack.github.io/gitguard/).
+- Allure results are collected from /app/allure-results and uploaded as artifacts; an additional job generates Allure HTML and publishes it to GitHub Pages - [Allure Report on Github Pages](https://dimastack.github.io/gitguard/).
 ![Allure reporting - ](./artifacts/images/allure.png)
 - The test step is continue-on-error (or tolerant) and artifact + report steps are if: always() — this ensures we always publish report even if tests fail.
 - Matrix: CI can run multiple matrix entries (different git versions) — for containerized runs this is typically implemented by building tester images with different build args/tags.
