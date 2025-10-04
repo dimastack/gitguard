@@ -100,7 +100,9 @@ jobs:
     
       - name: Generate Allure Report
         run: |
-          allure merge ./allure-results/unit ./allure-results/e2e -o ./allure-results-merged
+          mkdir -p ./allure-results-merged
+          cp -r ./allure-results/unit/* ./allure-results-merged/ || true
+          cp -r ./allure-results/e2e/* ./allure-results-merged/ || true
           allure generate ./allure-results-merged -o ./allure-report --clean
 
       - name: Upload Pages artifact
