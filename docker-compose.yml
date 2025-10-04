@@ -18,9 +18,9 @@ services:
       GITEA__server__START_SSH_SERVER: true
       GITEA__security__INSTALL_LOCK: true
       GITEA__service__DISABLE_REGISTRATION: true
-      GITEA_ADMIN_USER: admin
-      GITEA_ADMIN_PASSWORD: admin123
-      GITEA_ADMIN_EMAIL: admin@gitea.local
+      GITEA_ADMIN_USER: gitadmin
+      GITEA_ADMIN_PASSWORD: gitadmin123
+      GITEA_ADMIN_EMAIL: gitadmin@gitea.local
       GITEA__security__SECRET_KEY: supersecret
     volumes:
       - ./data/gitea:/data
@@ -46,9 +46,9 @@ services:
       GITEA_BASE_URL: http://gitea:3000
       GITEA_SSH_HOST: gitea
       GITEA_SSH_PORT: 2222
-      GITEA_ADMIN_USER: admin
-      GITEA_ADMIN_PASSWORD: admin123
-      GITEA_ADMIN_EMAIL: admin@gitea.local
+      GITEA_ADMIN_USER: gitadmin
+      GITEA_ADMIN_PASSWORD: gitadmin123
+      GITEA_ADMIN_EMAIL: gitadmin@gitea.local
       GITEA_ADMIN_TOKEN_FILE: /data/gitea_admin_token
       PYTHONPATH: /app
     volumes:
