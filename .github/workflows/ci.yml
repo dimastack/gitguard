@@ -58,7 +58,8 @@ jobs:
           echo "[CI] Running E2E tests..."
           docker exec tester rm -rf /app/allure-results/e2e || true
           docker exec tester mkdir -p /app/allure-results/e2e
-          docker exec tester bash -c "export PYTHONUNBUFFERED=1; pytest -v -n auto -m 'e2e' --alluredir=/app/allure-results/e2e tests"
+          docker exec tester pytest -v -n auto \
+            -m "e2e" \--alluredir=/app/allure-results/e2e tests
 
       - name: Check memory usage
         run: |
