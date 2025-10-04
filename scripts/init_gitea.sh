@@ -13,7 +13,7 @@ REPO_NAME="test-repo"
 SSH_KEY_FILE="/etc/ssh_keys/id_rsa.pub"
 
 echo "[init] Waiting for Gitea to be healthy..."
-until curl -sf -o /dev/null "${GITEA_URL}/api/healthz"; do
+until curl -s -o /dev/null -w "%{http_code}" "${GITEA_URL}/api/healthz" | grep -q "200"; do
   sleep 2
 done
 
