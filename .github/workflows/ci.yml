@@ -1,4 +1,4 @@
-name: CI
+name: GITGUARD-CI
 
 on:
   push:
@@ -100,7 +100,8 @@ jobs:
     
       - name: Generate Allure Report
         run: |
-          allure generate ./allure-results -o ./allure-report --clean
+          allure merge ./allure-results/unit ./allure-results/e2e -o ./allure-results-merged
+          allure generate ./allure-results-merged -o ./allure-report --clean
 
       - name: Upload Pages artifact
         if: always()
