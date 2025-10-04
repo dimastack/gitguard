@@ -42,28 +42,19 @@ jobs:
         continue-on-error: true
         run: |
           echo "[CI] Running UNIT tests..."
-          docker exec tester rm -rf /app/allure-results/unit || true
-          docker exec tester mkdir -p /app/allure-results/unit
-          docker exec tester pytest -v -n auto \
+          mkdir -p ./allure-results/unit
+          docker compose run --rm tester pytest -v -n auto \
             -m "unit" \
             --alluredir=/app/allure-results/unit tests || true
-
-      - name: Check memory usage
-        run: |
-          docker stats --no-stream
 
       - name: Run e2e tests inside tester
         continue-on-error: true
         run: |
           echo "[CI] Running E2E tests..."
-          docker exec tester rm -rf /app/allure-results/e2e || true
-          docker exec tester mkdir -p /app/allure-results/e2e
-          docker exec tester pytest -v -n auto \
-            -m "e2e" \--alluredir=/app/allure-results/e2e tests
-
-      - name: Check memory usage
-        run: |
-          docker stats --no-stream
+          mkdir -p ./allure-results/e2e
+          docker compose run --rm tester pytest -v -n auto \
+            -m "e2e" \
+            --alluredir=/app/allure-results/e2e tests
 
       - name: Upload allure results
         if: always()
@@ -72,6 +63,10 @@ jobs:
           name: allure-results
           path: ./allure-results
           if-no-files-found: warn
+
+      - name: Stop containers and cleanup
+        if: always()
+        run: docker compose down -v
 
   deploy-report:
     needs: test
