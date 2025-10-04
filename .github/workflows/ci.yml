@@ -42,7 +42,6 @@ jobs:
         continue-on-error: true
         run: |
           echo "[CI] Running UNIT tests..."
-          docker exec tester rm -rf /app/allure-results || true
           docker exec tester rm -rf /app/allure-results/unit || true
           docker exec tester mkdir -p /app/allure-results/unit
           docker exec tester pytest -v -n auto \
@@ -57,7 +56,7 @@ jobs:
           docker exec tester mkdir -p /app/allure-results/e2e
           docker exec tester pytest -v -n auto \
             -m "e2e" \
-            --alluredir=/app/allure-results/e2e tests || true
+            --alluredir=/app/allure-results/e2e tests
 
       - name: Upload allure results
         if: always()
