@@ -20,27 +20,44 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and start services
+      - name: Build and start Gitea
         run: |
           docker compose build --no-cache
           docker compose up -d gitea
+
+      - name: Wait for Gitea to become ready
+        run: |
           echo "[CI] Waiting for Gitea to become ready..."
           bash scripts/wait_for_gitea.sh
-          docker compose up -d tester
 
-      - name: Run tests inside tester
+      - name: Initialize Gitea inside container
+        run: |
+          echo "[CI] Running init_gitea.sh inside gitea container..."
+          docker exec gitea bash /docker-entrypoint-init.d/init_gitea.sh
+
+      - name: Start tester
+        run: docker compose up -d tester
+
+      - name: Run unit tests inside tester
         continue-on-error: true
         run: |
-          # clean allure-results inside container before running tests
+          echo "[CI] Running UNIT tests..."
           docker exec tester rm -rf /app/allure-results || true
-          docker exec tester mkdir -p /app/allure-results
-          docker exec tester pytest -v -n auto --alluredir=/app/allure-results tests || true
+          docker exec tester rm -rf /app/allure-results/unit || true
+          docker exec tester mkdir -p /app/allure-results/unit
+          docker exec tester pytest -v -n auto \
+            -m "unit" \
+            --alluredir=/app/allure-results/unit tests || true
 
-      - name: Debug results on host
-        if: always()
+      - name: Run e2e tests inside tester
+        continue-on-error: true
         run: |
-          echo "[DEBUG] On host after tests:"
-          ls -la ./allure-results || true
+          echo "[CI] Running E2E tests..."
+          docker exec tester rm -rf /app/allure-results/e2e || true
+          docker exec tester mkdir -p /app/allure-results/e2e
+          docker exec tester pytest -v -n auto \
+            -m "e2e" \
+            --alluredir=/app/allure-results/e2e tests || true
 
       - name: Upload allure results
         if: always()
@@ -48,6 +65,7 @@ jobs:
         with:
           name: allure-results
           path: ./allure-results
+          if-no-files-found: warn
 
   deploy-report:
     needs: test
