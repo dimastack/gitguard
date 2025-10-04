@@ -1,3 +1,4 @@
+# clients/git_client.py
 from __future__ import annotations
 
 import subprocess
@@ -8,7 +9,7 @@ import logging
 import shlex
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, Tuple, List, Dict, Any
 
 try:
     import allure
@@ -16,6 +17,7 @@ try:
 except Exception:
     _HAS_ALLURE = False
 
+# Single named logger for the whole project (configure it centrally)
 logger = logging.getLogger("gitguard")
 
 
@@ -27,6 +29,11 @@ class GitResult:
     stderr: str
     duration: float  # seconds
 
+    # keep old name `code` and provide `returncode` alias for tests
+    @property
+    def returncode(self) -> int:
+        return self.code
+
     def ok(self) -> bool:
         return self.code == 0
 
@@ -34,7 +41,15 @@ class GitResult:
 class GitClient:
     """
     Thin wrapper around the system `git` command used by tests.
-    Provides convenience methods for core git operations.
+
+    Construction:
+        GitClient(protocol="ssh", host="gitea", owner="alice", repo="demo", workdir="/workspace")
+
+    Behavior:
+    - Builds repo URLs from protocol/host/owner/repo when repo_url is not provided.
+    - Enables internal git trace logs (GIT_TRACE, GIT_CURL_VERBOSE, ssh -v) by default.
+    - Writes per-run artifact log to `artifacts/git-<timestamp>.log`.
+    - Attaches the log to Allure after each command (if Allure is available).
     """
 
     def __init__(
@@ -66,20 +81,35 @@ class GitClient:
         ts = datetime.datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
         self.log_path = self.artifacts / f"git-client-{ts}.log"
 
-    # -----------------------
-    # Helpers
-    # -----------------------
+        logger.debug(
+            "Initialized GitClient: protocol=%s host=%s owner=%s repo=%s workdir=%s artifacts=%s",
+            self.protocol,
+            self.host,
+            self.owner,
+            self.repo,
+            str(self.workdir),
+            str(self.artifacts),
+        )
 
+    # -----------------------
+    # URL builder / helpers
+    # -----------------------
     def _make_repo_url(self, protocol: Optional[str] = None, host: Optional[str] = None,
                        owner: Optional[str] = None, repo: Optional[str] = None) -> str:
+        """
+        Build a repo URL using the client defaults unless explicit overrides are provided.
+        Raises ValueError if owner/repo/host are missing.
+        """
         proto = (protocol or self.protocol).lower()
         h = host or self.host
         o = owner or self.owner
         r = repo or self.repo
+
         if not (h and o and r):
             raise ValueError("host/owner/repo must be provided to build repository URL")
 
         repo_path = f"{o}/{r}.git"
+
         if proto in ("http", "https"):
             return f"{proto}://{h}/{repo_path}"
         if proto == "git":
@@ -88,153 +118,168 @@ class GitClient:
             return f"git@{h}:{repo_path}"
         raise ValueError(f"Unsupported protocol '{proto}'")
 
-    def _write_log(self, cmd: List[str], env: dict, duration: float, rc: int, stdout: str, stderr: str) -> None:
+    def _write_log_header(self, cmd: List[str], env: dict, duration: float, rc: int, stdout: str, stderr: str) -> None:
         header = (
             f"\n---\nTime: {datetime.datetime.utcnow().isoformat()}Z\n"
             f"Workdir: {self.workdir}\n"
             f"Command: {shlex.join(cmd)}\n"
+            f"Env (GIT_TRACE/GIT_CURL_VERBOSE/GIT_SSH_COMMAND): "
+            f"{env.get('GIT_TRACE')} / {env.get('GIT_CURL_VERBOSE')} / {env.get('GIT_SSH_COMMAND')}\n"
             f"Return code: {rc}\n"
             f"Duration: {duration:.6f} sec\n"
             f"---\n"
         )
-        with open(self.log_path, "a", encoding="utf-8") as f:
-            f.write(header)
-            if stdout:
-                f.write("STDOUT:\n" + stdout + "\n")
-            if stderr:
-                f.write("STDERR:\n" + stderr + "\n")
-            f.flush()
+        try:
+            with open(self.log_path, "a", encoding="utf-8") as f:
+                f.write(header)
+                if stdout:
+                    f.write("STDOUT:\n")
+                    f.write(stdout + ("\n" if not stdout.endswith("\n") else ""))
+                if stderr:
+                    f.write("STDERR:\n")
+                    f.write(stderr + ("\n" if not stderr.endswith("\n") else ""))
+                f.flush()
+        except Exception:
+            logger.exception("Failed writing git-client log to %s", self.log_path)
 
     def _attach_log_to_allure(self, note: Optional[str] = None) -> None:
-        if not self.attach_logs_always or not _HAS_ALLURE:
+        if not self.attach_logs_always:
+            return
+        if not _HAS_ALLURE:
+            logger.debug("Allure not available; skipping attaching log.")
             return
         try:
-            name = "git-client-log" + (f"-{note}" if note else "")
+            name = f"git-client-log"
+            if note:
+                name = f"{name}-{note}"
+            # attach the current log file content
             with open(self.log_path, "rb") as fh:
                 allure.attach(fh.read(), name=name, attachment_type=allure.attachment_type.TEXT)
         except Exception as e:
-            logger.exception("Failed to attach log to Allure: %s", e)
+            logger.exception("Failed to attach git client log to Allure: %s", e)
 
-    def _run(self, args: List[str], extra_env: Optional[dict] = None) -> GitResult:
+    # -----------------------
+    # Core runner
+    # -----------------------
+    def _run(self, args: List[str], workdir: Optional[str] = None, extra_env: Optional[dict] = None) -> GitResult:
+        """
+        Run a git command with optional workdir and environment.
+        Uses subprocess.run so tests can mock subprocess.run easily.
+        Returns GitResult. Exceptions from subprocess.run (OSError, PermissionError, TimeoutError) are allowed to bubble up.
+        """
         cmd = ["git"] + args
+        logger.debug("About to run git command: %s", shlex.join(cmd))
+
         env = os.environ.copy()
         if extra_env:
             env.update({k: str(v) for k, v in extra_env.items()})
+
         if self.enable_trace:
             env.setdefault("GIT_TRACE", "1")
             env.setdefault("GIT_CURL_VERBOSE", "1")
             env.setdefault("GIT_SSH_COMMAND", "ssh -v")
 
+        cwd = Path(workdir) if workdir else self.workdir
+
         start = time.perf_counter()
-        proc = subprocess.Popen(
-            cmd,
-            cwd=str(self.workdir),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            env=env,
-        )
-        out, err = proc.communicate()
+        # Use subprocess.run to make mocking easier in unit tests
+        try:
+            completed = subprocess.run(
+                cmd,
+                cwd=str(cwd),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                env=env,
+                check=False,
+            )
+        except Exception as exc:
+            # write a brief log and re-raise so tests see exceptions (PermissionError/OSError/TimeoutError etc.)
+            duration = time.perf_counter() - start
+            try:
+                self._write_log_header(cmd, env, duration, -1, "", str(exc))
+                self._attach_log_to_allure()
+            except Exception:
+                logger.exception("Failed to log failed run")
+            raise
+
         duration = time.perf_counter() - start
-        rc = proc.returncode
+        rc = completed.returncode
+        out = completed.stdout or ""
+        err = completed.stderr or ""
 
-        self._write_log(cmd, env, duration, rc, out or "", err or "")
-        self._attach_log_to_allure()
+        # write comprehensive log (best-effort)
+        try:
+            self._write_log_header(cmd, env, duration, rc, out, err)
+        except Exception:
+            logger.exception("Failed writing git-client log to %s", self.log_path)
 
-        return GitResult(code=rc, stdout=(out or "").strip(), stderr=(err or "").strip(), duration=duration)
+        # attach log (best-effort)
+        try:
+            self._attach_log_to_allure()
+        except Exception:
+            logger.exception("Failed attaching log to Allure")
+
+        return GitResult(code=rc, stdout=out.strip(), stderr=err.strip(), duration=duration)
 
     # -----------------------
-    # Core operations
+    # Public operations
     # -----------------------
-
-    def init(self) -> GitResult:
-        return self._run(["init"])
 
     def clone(self, target_dir: Optional[str] = None, repo_url: Optional[str] = None,
               protocol: Optional[str] = None, host: Optional[str] = None,
-              owner: Optional[str] = None, repo: Optional[str] = None) -> GitResult:
-        url = repo_url or self._make_repo_url(protocol=protocol, host=host, owner=owner, repo=repo)
+              owner: Optional[str] = None, repo: Optional[str] = None, workdir: Optional[str] = None) -> GitResult:
+        """
+        Clone repository. If repo_url is provided it is used verbatim;
+        otherwise URL is constructed from protocol/host/owner/repo (overrides allowed).
+        Accepts optional `workdir` to run inside.
+        """
+        if repo_url:
+            url = repo_url
+        else:
+            url = self._make_repo_url(protocol=protocol, host=host, owner=owner, repo=repo)
         args = ["clone", url]
         if target_dir:
             args.append(target_dir)
-        return self._run(args)
+        return self._run(args, workdir=workdir)
 
-    def add(self, path: str = ".") -> GitResult:
-        return self._run(["add", path])
+    def init(self, workdir: Optional[str] = None) -> GitResult:
+        """Initialize a repository in workdir (or self.workdir if not provided)."""
+        return self._run(["init"], workdir=workdir)
 
-    def commit(self, message: str) -> GitResult:
-        return self._run(["commit", "-m", message])
+    def add(self, path: str = ".", workdir: Optional[str] = None) -> GitResult:
+        return self._run(["add", path], workdir=workdir)
 
-    def push(self, remote: str = "origin", branch: str = "main") -> GitResult:
-        return self._run(["push", remote, branch])
+    def commit(self, message: str, workdir: Optional[str] = None) -> GitResult:
+        # commit might fail if user.email/name not set — tests may set it earlier
+        return self._run(["commit", "-m", message], workdir=workdir)
 
-    def pull(self, remote: str = "origin", branch: str = "main") -> GitResult:
-        return self._run(["pull", remote, branch])
+    def push(self, workdir: Optional[str] = None, remote: str = "origin", branch: str = "main") -> GitResult:
+        """
+        Push current branch. Accepts workdir as first argument (for backward compatibility tests that pass path first).
+        Note: tests commonly call client.push("/tmp/repo"), so to keep compatibility the first positional is workdir.
+        """
+        return self._run(["push", remote, branch], workdir=workdir)
 
-    def fetch(self, remote: str = "origin") -> GitResult:
-        return self._run(["fetch", remote])
+    def pull(self, workdir: Optional[str] = None, remote: str = "origin", branch: str = "main") -> GitResult:
+        return self._run(["pull", remote, branch], workdir=workdir)
 
-    def status(self) -> GitResult:
-        return self._run(["status"])
+    def fetch(self, workdir: Optional[str] = None, remote: str = "origin") -> GitResult:
+        return self._run(["fetch", remote], workdir=workdir)
 
-    def checkout(self, branch: str) -> GitResult:
-        return self._run(["checkout", branch])
+    def status(self, workdir: Optional[str] = None) -> GitResult:
+        return self._run(["status"], workdir=workdir)
 
-    def branch(self, name: str) -> GitResult:
-        return self._run(["branch", name])
+    def checkout(self, branch: str, workdir: Optional[str] = None) -> GitResult:
+        return self._run(["checkout", branch], workdir=workdir)
 
-    def merge(self, branch: str) -> GitResult:
-        return self._run(["merge", branch])
+    def branch(self, name: str, workdir: Optional[str] = None) -> GitResult:
+        return self._run(["branch", name], workdir=workdir)
 
-    def rebase(self, branch: str) -> GitResult:
-        return self._run(["rebase", branch])
-
-    def tag(self, name: str, message: Optional[str] = None) -> GitResult:
-        args = ["tag"]
-        if message:
-            args.extend(["-a", name, "-m", message])
-        else:
-            args.append(name)
-        return self._run(args)
-
-    def list_tags(self) -> GitResult:
-        return self._run(["tag", "--list"])
-
-    def delete_tag(self, name: str) -> GitResult:
-        return self._run(["tag", "-d", name])
-
-    def remote_add(self, name: str, url: str) -> GitResult:
-        return self._run(["remote", "add", name, url])
-
-    def remote_remove(self, name: str) -> GitResult:
-        return self._run(["remote", "remove", name])
-
-    def remote_list(self) -> GitResult:
-        return self._run(["remote", "-v"])
-
-    def config_set(self, key: str, value: str) -> GitResult:
-        return self._run(["config", key, value])
-
-    def config_get(self, key: str) -> GitResult:
-        return self._run(["config", "--get", key])
-
-    def log(self, n: int = 10) -> GitResult:
-        return self._run(["log", f"-n{n}", "--oneline"])
-
-    def diff(self, rev1: str = "HEAD~1", rev2: str = "HEAD") -> GitResult:
-        return self._run(["diff", f"{rev1}..{rev2}"])
-
-    def reset(self, mode: str = "soft", commit: str = "HEAD~1") -> GitResult:
-        return self._run(["reset", f"--{mode}", commit])
-
-    def stash_save(self, message: str = "") -> GitResult:
-        args = ["stash", "save"]
-        if message:
-            args.append(message)
-        return self._run(args)
-
-    def stash_pop(self, index: int = 0) -> GitResult:
-        return self._run(["stash", "pop", f"stash@{{{index}}}"])
-
-    def stash_list(self) -> GitResult:
-        return self._run(["stash", "list"])
+    # alias expected in tests
+    def switch(self, workdir: Optional[str], branch: str) -> GitResult:
+        """
+        Switch branch (compatibility wrapper).
+        Tests call client.switch("/tmp/repo", "branch").
+        """
+        return self.checkout(branch, workdir=workdir)
