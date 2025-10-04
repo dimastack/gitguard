@@ -35,14 +35,17 @@ jobs:
           echo "[CI] Running init_gitea.sh inside gitea container..."
           docker exec gitea bash /docker-entrypoint-init.d/init_gitea.sh
 
-      - name: Start tester
-        run: docker compose up -d tester
+      - name: Prepare allure-results directories
+        if: always()
+        run: |
+          sudo rm -rf ./allure-results || true
+          sudo mkdir -p ./allure-results/unit ./allure-results/e2e
+          sudo chmod -R 777 ./allure-results
 
       - name: Run unit tests inside tester
         continue-on-error: true
         run: |
           echo "[CI] Running UNIT tests..."
-          mkdir -p ./allure-results/unit
           docker compose run --rm tester pytest -v -n auto \
             -m "unit" \
             --alluredir=/app/allure-results/unit tests || true
@@ -51,7 +54,6 @@ jobs:
         continue-on-error: true
         run: |
           echo "[CI] Running E2E tests..."
-          mkdir -p ./allure-results/e2e
           docker compose run --rm tester pytest -v -n auto \
             -m "e2e" \
             --alluredir=/app/allure-results/e2e tests
