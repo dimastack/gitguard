@@ -1,102 +1,110 @@
 import pytest
 
-from gitguard.clients.http_gitea_client import GiteaHttpClient
-
 
 @pytest.mark.e2e
-def test_health_and_version(gitea_client: GiteaHttpClient):
+def test_health_and_version(gitea_client):
     """
     Basic health/version checks of Gitea API.
     """
-    # health_check should be reachable
+
+    # Health check should pass
     res = gitea_client.health_check()
     assert res.ok(), f"Health-check failed: {res.status_code} {getattr(res, 'text', '')}"
 
-    # version endpoint should return JSON with some version info
+    # Version endpoint should return JSON with version info
     res = gitea_client.version()
     assert res.ok(), f"Version endpoint failed: {res.status_code} {getattr(res, 'text', '')}"
     data = res.json()
     assert isinstance(data, dict), f"Version response must be JSON object, got: {type(data)}"
-    # at minimum expect some key describing version info
-    assert any(k in data for k in ("version", "tag_name", "sha", "version_tag")), f"Unexpected version payload: {data}"
+    assert any(k in data for k in ("version", "tag_name", "sha", "version_tag")), \
+        f"Unexpected version payload: {data}"
 
 
 @pytest.mark.e2e
-def test_repo_rename_and_delete(gitea_client: GiteaHttpClient):
+def test_repo_rename_and_delete(gitea_client):
     """
     Create a repo for a test user, rename it, verify rename, then delete and verify deletion.
     """
+
     username = "misc_repo_owner"
     email = "misc_repo_owner@example.com"
     password = "Password123!"
     original_repo = "misc-repo"
     renamed_repo = "misc-repo-renamed"
 
-    # ensure owner exists (create_user may return 422 if already exists)
-    r = gitea_client.create_user(username=username, email=email, password=password)
-    assert r.ok() or r.status_code in (422, 409), f"Precondition: create_user failed: {r.status_code} {getattr(r,'text','')}"
+    # Ensure owner exists
+    resp = gitea_client.create_user(username=username, email=email, password=password)
+    assert resp.ok() or resp.status_code in (422, 409), \
+        f"Precondition: create_user failed: {resp.status_code} {getattr(resp, 'text', '')}"
 
-    # create repo under the user
-    r = gitea_client.create_repo(original_repo, private=False, description="misc repo")
-    assert r.ok(), f"Repo creation failed: {r.status_code} {getattr(r,'text','')}"
-    repo_data = r.json()
+    # Create repo under the user
+    resp = gitea_client.create_repo(original_repo, private=False, description="misc repo")
+    assert resp.ok(), f"Repo creation failed: {resp.status_code} {getattr(resp, 'text', '')}"
+    repo_data = resp.json()
     assert repo_data.get("name") == original_repo or repo_data.get("full_name", "").endswith(original_repo), \
         f"Unexpected repo data after create: {repo_data}"
 
-    # rename repository (patch)
-    r = gitea_client.rename_repo(owner=username, repo=original_repo, new_name=renamed_repo)
-    assert r.ok(), f"Rename repo failed: {r.status_code} {getattr(r,'text','')}"
-    # after rename, fetching old name should fail
+    # Rename repository
+    resp = gitea_client.rename_repo(owner=username, repo=original_repo, new_name=renamed_repo)
+    assert resp.ok(), f"Rename repo failed: {resp.status_code} {getattr(resp, 'text', '')}"
+
+    # Verify old repo no longer exists
     r_old = gitea_client.get_repo(owner=username, repo=original_repo)
     assert not r_old.ok(), f"Old repo name still exists after rename: {r_old.status_code}"
-    # fetching new name should succeed
+
+    # Verify new repo exists
     r_new = gitea_client.get_repo(owner=username, repo=renamed_repo)
-    assert r_new.ok(), f"Renamed repo not found: {r_new.status_code} {getattr(r_new,'text','')}"
-    assert r_new.json().get("name") == renamed_repo or r_new.json().get("full_name","").endswith(renamed_repo)
+    assert r_new.ok(), f"Renamed repo not found: {r_new.status_code} {getattr(r_new, 'text', '')}"
+    data = r_new.json()
+    assert data.get("name") == renamed_repo or data.get("full_name", "").endswith(renamed_repo)
 
-    # delete repo
-    r = gitea_client.delete_repo(owner=username, repo=renamed_repo)
-    assert r.ok(), f"Delete repo failed: {r.status_code} {getattr(r,'text','')}"
+    # Delete repo
+    resp = gitea_client.delete_repo(owner=username, repo=renamed_repo)
+    assert resp.ok(), f"Delete repo failed: {resp.status_code} {getattr(resp, 'text', '')}"
 
-    # verify deletion
-    r = gitea_client.get_repo(owner=username, repo=renamed_repo)
-    assert not r.ok(), f"Repository still present after delete: {r.status_code}"
-    assert r.status_code == 404, f"Expected 404 after delete, got {r.status_code} {getattr(r,'text','')}"
+    # Verify deletion
+    resp = gitea_client.get_repo(owner=username, repo=renamed_repo)
+    assert not resp.ok(), f"Repository still present after delete: {resp.status_code}"
+    assert resp.status_code == 404, f"Expected 404 after delete, got {resp.status_code} {getattr(resp, 'text', '')}"
 
 
 @pytest.mark.e2e
-def test_list_unadopted_and_adopt_negative(gitea_client: GiteaHttpClient):
+def test_list_unadopted_and_adopt_negative(gitea_client):
     """
     Check admin unadopted repos endpoint and negative adoption case.
     """
-    # list unadopted repos (should succeed and return a list)
-    r = gitea_client.list_unadopted_repos()
-    assert r.ok(), f"List unadopted repos failed: {r.status_code} {getattr(r,'text','')}"
-    data = r.json()
+
+    # List unadopted repos (should succeed)
+    resp = gitea_client.list_unadopted_repos()
+    assert resp.ok(), f"List unadopted repos failed: {resp.status_code} {getattr(resp, 'text', '')}"
+    data = resp.json()
     assert isinstance(data, list), f"Unadopted repos endpoint must return list, got {type(data)}"
 
-    # negative: try to adopt a repo that likely doesn't exist -> expect failure
+    # Negative: adopt non-existing repo -> expect 4xx failure
     fake_owner = "noone"
     fake_repo = "no-such-repo-xyz"
-    r = gitea_client.adopt_unadopted_repo(owner=fake_owner, repo_name=fake_repo)
-    # adoption of non-existing/unadopted repo should fail (either 4xx or specific error)
-    assert not r.ok(), "Adopting non-existent repo unexpectedly succeeded"
-    assert r.status_code in (400, 404, 422), f"Unexpected status for adopt failure: {r.status_code} {getattr(r,'text','')}"
+    resp = gitea_client.adopt_unadopted_repo(owner=fake_owner, repo_name=fake_repo)
+    assert not resp.ok(), "Adopting non-existent repo unexpectedly succeeded"
+    assert resp.status_code in (400, 404, 422), \
+        f"Unexpected status for adopt failure: {resp.status_code} {getattr(resp, 'text', '')}"
 
 
 @pytest.mark.e2e
-def test_create_repo_invalid_payload(gitea_client: GiteaHttpClient):
+def test_create_repo_invalid_payload(gitea_client):
     """
     Negative: creating a repository with invalid body (empty name) must fail.
     """
-    # prepare user
+
     username = "invalid_payload_user"
     email = "invalid_payload@example.com"
     password = "Password123!"
-    r = gitea_client.create_user(username=username, email=email, password=password)
-    assert r.ok() or r.status_code in (422, 409)
 
-    # try to create repo with invalid name (empty) - should fail
-    r = gitea_client.create_repo(name="", private=False, description="should fail")
-    assert not r.ok(), "Creating repo with empty name should fail"
-    assert r.status_code in (400, 422), f"Expected validation error, got {r.status_code} {getattr(r,'text','')}"
+    # Prepare user
+    resp = gitea_client.create_user(username=username, email=email, password=password)
+    assert resp.ok() or resp.status_code in (422, 409)
+
+    # Try invalid repo create
+    resp = gitea_client.create_repo(name="", private=False, description="should fail")
+    assert not resp.ok(), "Creating repo with empty name should fail"
+    assert resp.status_code in (400, 422), \
+        f"Expected validation error, got {resp.status_code} {getattr(resp, 'text', '')}"

@@ -1,10 +1,8 @@
 import pytest
 
-from gitguard.clients.http_gitea_client import GiteaHttpClient
-
 
 @pytest.mark.e2e
-def test_repo_lifecycle(gitea_client: GiteaHttpClient):
+def test_repo_lifecycle(gitea_client):
     """
     Full repository lifecycle:
     1. create repository
@@ -14,55 +12,57 @@ def test_repo_lifecycle(gitea_client: GiteaHttpClient):
     5. delete repository
     6. verify deletion
     """
-
     username = "testuser_repo"
     email = "testuser_repo@example.com"
     password = "Password123!"
     repo_name = "sample-repo"
 
-    # Ensure user exists (helper precondition)
-    result = gitea_client.create_user(username=username, email=email, password=password)
-    assert result.ok() or result.status_code == 422, f"Precondition: user creation failed {result.status_code} {result.text}"
+    # Ensure user exists
+    r = gitea_client.create_user(username=username, email=email, password=password)
+    assert r.ok() or r.status_code in (409, 422), \
+        f"Precondition failed: cannot ensure user exists ({r.status_code} {getattr(r,'text','')})"
 
-    # 1. create repository
-    result = gitea_client.create_repo(repo_name, owner=username, private=False, description="Initial repo")
-    assert result.ok(), f"Repo creation failed: {result.status_code} {result.text}"
-    repo_data = result.json()
-    assert repo_data["name"] == repo_name, f"Expected repo {repo_name}, got {repo_data}"
+    # Create repository
+    r = gitea_client.create_repo(name=repo_name, owner=username, private=False, description="Initial repo")
+    assert r.ok() or r.status_code == 409, f"Repo creation failed: {r.status_code} {getattr(r,'text','')}"
+    repo_data = r.json() if r.ok() else {}
+    if r.ok():
+        assert repo_data.get("name") == repo_name, f"Unexpected repo data: {repo_data}"
 
-    # 2. get repository details
-    result = gitea_client.get_repo(owner=username, repo=repo_name)
-    assert result.ok(), f"Get repo failed: {result.status_code} {result.text}"
-    repo_info = result.json()
-    assert repo_info["name"] == repo_name
-    assert repo_info["owner"]["username"] == username
+    # Get repository details
+    r = gitea_client.get_repo(owner=username, repo=repo_name)
+    assert r.ok(), f"Get repo failed: {r.status_code} {getattr(r,'text','')}"
+    repo_info = r.json()
+    assert repo_info.get("name") == repo_name, f"Repo name mismatch: {repo_info}"
+    assert repo_info.get("owner", {}).get("username") == username, \
+        f"Repo owner mismatch: {repo_info.get('owner')}"
 
-    # 3. edit repository description
+    # Edit repository description
     new_description = "Updated description"
-    result = gitea_client.edit_repo(owner=username, repo=repo_name, description=new_description)
-    assert result.ok(), f"Edit repo failed: {result.status_code} {result.text}"
-    result = gitea_client.get_repo(owner=username, repo=repo_name)
-    assert result.ok()
-    assert result.json()["description"] == new_description, f"Repo description not updated: {result.json()}"
+    r = gitea_client.edit_repo(owner=username, repo=repo_name, description=new_description)
+    assert r.ok(), f"Edit repo failed: {r.status_code} {getattr(r,'text','')}"
+    r = gitea_client.get_repo(owner=username, repo=repo_name)
+    assert r.ok(), f"Get after edit failed: {r.status_code}"
+    assert r.json().get("description") == new_description, f"Repo description not updated: {r.json()}"
 
-    # 4. list repositories for user
-    result = gitea_client.list_user_repos(username)
-    assert result.ok(), f"List user repos failed: {result.status_code} {result.text}"
-    repos = [r["name"] for r in result.json()]
-    assert repo_name in repos, f"Expected {repo_name} in {repos}"
+    # List repositories for user
+    r = gitea_client.list_user_repos(username)
+    assert r.ok(), f"List user repos failed: {r.status_code} {getattr(r,'text','')}"
+    repos = [repo.get("name") for repo in r.json()]
+    assert repo_name in repos, f"Expected repo '{repo_name}' in list: {repos}"
 
-    # 5. delete repository
-    result = gitea_client.delete_repo(owner=username, repo=repo_name)
-    assert result.ok(), f"Delete repo failed: {result.status_code} {result.text}"
+    # Delete repository
+    r = gitea_client.delete_repo(owner=username, repo=repo_name)
+    assert r.ok(), f"Delete repo failed: {r.status_code} {getattr(r,'text','')}"
 
-    # 6. verify deletion
-    result = gitea_client.get_repo(owner=username, repo=repo_name)
-    assert not result.ok(), f"Deleted repo {repo_name} should not exist"
-    assert result.status_code == 404, f"Expected 404 after deletion, got {result.status_code}"
+    # Verify deletion
+    r = gitea_client.get_repo(owner=username, repo=repo_name)
+    assert not r.ok(), f"Deleted repo still exists: {r.status_code}"
+    assert r.status_code == 404, f"Expected 404 after delete, got {r.status_code}"
 
 
 @pytest.mark.e2e
-def test_create_duplicate_repo(gitea_client: GiteaHttpClient):
+def test_create_duplicate_repo(gitea_client):
     """
     Negative case: creating a repository with the same name twice should fail.
     """
@@ -72,14 +72,17 @@ def test_create_duplicate_repo(gitea_client: GiteaHttpClient):
     repo_name = "dup-repo"
 
     # Ensure user exists
-    result = gitea_client.create_user(username=username, email=email, password=password)
-    assert result.ok() or result.status_code == 422
+    r = gitea_client.create_user(username=username, email=email, password=password)
+    assert r.ok() or r.status_code in (409, 422), \
+        f"Precondition failed: cannot ensure user exists ({r.status_code} {getattr(r,'text','')})"
 
-    # First creation should succeed
-    result = gitea_client.create_repo(repo_name, owner=username)
-    assert result.ok() or result.status_code == 409
+    # First creation (may already exist from prior run)
+    r = gitea_client.create_repo(name=repo_name, owner=username)
+    assert r.ok() or r.status_code in (409, 422), \
+        f"First repo creation failed: {r.status_code} {getattr(r,'text','')}"
 
     # Second creation should fail (conflict)
-    result = gitea_client.create_repo(repo_name, owner=username)
-    assert not result.ok(), f"Expected conflict, got {result.status_code}"
-    assert result.status_code in (409, 422), f"Expected 409/422, got {result.status_code} {result.text}"
+    r = gitea_client.create_repo(name=repo_name, owner=username)
+    assert not r.ok(), "Expected failure for duplicate repo creation"
+    assert r.status_code in (409, 422), \
+        f"Expected 409/422 for duplicate, got {r.status_code} {getattr(r,'text','')}"

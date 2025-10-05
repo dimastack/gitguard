@@ -1,63 +1,56 @@
 import pytest
 
-from gitguard.clients.git_client import GitClient
-
 
 @pytest.mark.unit
-def test_pull_success(mocker):
+def test_pull_success(mocker, git_client):
     mock_run = mocker.patch("subprocess.run")
     mock_run.return_value.returncode = 0
     mock_run.return_value.stdout = "Already up to date."
     mock_run.return_value.stderr = ""
 
-    client = GitClient(protocol="http")
-    result = client.pull("/tmp/repo")
+    result = git_client.pull(str(git_client.workdir))
 
     assert result.returncode == 0
     assert "Already up to date" in result.stdout
 
 
 @pytest.mark.unit
-def test_pull_conflict(mocker):
+def test_pull_conflict(mocker, git_client):
     mock_run = mocker.patch("subprocess.run")
     mock_run.return_value.returncode = 1
     mock_run.return_value.stdout = ""
     mock_run.return_value.stderr = "CONFLICT (content): Merge conflict"
 
-    client = GitClient(protocol="http")
-    result = client.pull("/tmp/repo")
+    result = git_client.pull(str(git_client.workdir))
 
     assert result.returncode == 1
     assert "CONFLICT" in result.stderr
 
 
 @pytest.mark.unit
-def test_pull_not_a_repo(mocker):
+def test_pull_not_a_repo(mocker, git_client):
     mock_run = mocker.patch("subprocess.run")
     mock_run.return_value.returncode = 128
     mock_run.return_value.stdout = ""
     mock_run.return_value.stderr = "fatal: not a git repository"
 
-    client = GitClient(protocol="http")
-    result = client.pull("/tmp/not_a_repo")
+    result = git_client.pull(str(git_client.workdir))
 
     assert result.returncode == 128
     assert "not a git repository" in result.stderr
 
 
 @pytest.mark.unit
-def test_pull_timeout(mocker):
+def test_pull_timeout(mocker, git_client):
     mocker.patch("subprocess.run", side_effect=TimeoutError("pull timed out"))
 
-    client = GitClient(protocol="http")
     with pytest.raises(TimeoutError):
-        client.pull("/tmp/repo")
+        git_client.pull(str(git_client.workdir))
 
 
 @pytest.mark.unit
-def test_pull_git_not_found(mocker):
+def test_pull_git_not_found(mocker, git_client):
     mocker.patch("subprocess.run", side_effect=OSError("git not found"))
 
-    client = GitClient(protocol="http")
     with pytest.raises(OSError):
-        client.pull("/tmp/repo")
+        git_client.pull(str(git_client.workdir))
