@@ -55,11 +55,7 @@ class GiteaHttpClient(HttpClient):
             logger.error(f"Failed to read token file {path}: {e}")
         return None
 
-    # ---------- Health ----------
-
-    def health_check(self) -> HttpResult:
-        """Check if Gitea API is reachable."""
-        return self.get("", headers=self._auth_headers())
+    # ---------- Version ----------
 
     def version(self) -> HttpResult:
         """Get Gitea version info."""

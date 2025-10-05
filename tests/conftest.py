@@ -27,8 +27,8 @@ def gitea_token():
 @pytest.fixture(scope="session")
 def gitea_client(gitea_base_url, gitea_token) -> GiteaHttpClient:
     client = GiteaHttpClient(base_url=gitea_base_url, token=gitea_token)
-    health = client.health_check()
-    assert health.ok(), f"Gitea server not reachable at {gitea_base_url} (status={health.status_code})"
+    version = client.version()
+    assert version.ok(), f"Gitea server not reachable at {gitea_base_url} (status={version.status_code})"
     return client
 
 @pytest.fixture
