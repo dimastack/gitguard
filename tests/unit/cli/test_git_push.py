@@ -1,77 +1,71 @@
 import pytest
 
-from gitguard.clients.git_client import GitClient
-
 
 @pytest.mark.unit
-def test_push_success(mocker):
+def test_push_success(mocker, git_client):
     mock_run = mocker.patch("subprocess.run")
     mock_run.return_value.returncode = 0
     mock_run.return_value.stdout = "Pushed"
     mock_run.return_value.stderr = ""
 
-    client = GitClient(protocol="http")
-    result = client.push("/tmp/repo")
+    result = git_client.push(str(git_client.workdir))
 
     assert result.returncode == 0
     assert "Pushed" in result.stdout
 
 
 @pytest.mark.unit
-def test_push_rejected(mocker):
+def test_push_rejected(mocker, git_client):
     mock_run = mocker.patch("subprocess.run")
     mock_run.return_value.returncode = 1
     mock_run.return_value.stdout = ""
     mock_run.return_value.stderr = "[rejected] main -> main (fetch first)"
 
-    client = GitClient(protocol="http")
-    result = client.push("/tmp/repo")
+    result = git_client.push(str(git_client.workdir))
 
     assert result.returncode == 1
     assert "rejected" in result.stderr
 
 
 @pytest.mark.unit
-def test_push_permission_denied(mocker):
+def test_push_permission_denied(mocker, git_client):
     mock_run = mocker.patch("subprocess.run")
     mock_run.return_value.returncode = 128
     mock_run.return_value.stdout = ""
-    mock_run.return_value.stderr = "fatal: Authentication failed for 'http://example.com/repo.git/'"
+    mock_run.return_value.stderr = (
+        "fatal: Authentication failed for 'http://example.com/repo.git/'"
+    )
 
-    client = GitClient(protocol="http")
-    result = client.push("/tmp/repo")
+    result = git_client.push(str(git_client.workdir))
 
     assert result.returncode == 128
     assert "Authentication failed" in result.stderr
 
 
 @pytest.mark.unit
-def test_push_not_a_repo(mocker):
+def test_push_not_a_repo(mocker, git_client):
     mock_run = mocker.patch("subprocess.run")
     mock_run.return_value.returncode = 128
     mock_run.return_value.stdout = ""
     mock_run.return_value.stderr = "fatal: not a git repository"
 
-    client = GitClient(protocol="http")
-    result = client.push("/tmp/not_a_repo")
+    result = git_client.push(str(git_client.workdir))
 
     assert result.returncode == 128
     assert "not a git repository" in result.stderr
 
 
 @pytest.mark.unit
-def test_push_timeout(mocker):
+def test_push_timeout(mocker, git_client):
     mocker.patch("subprocess.run", side_effect=TimeoutError("push timed out"))
 
-    client = GitClient(protocol="http")
     with pytest.raises(TimeoutError):
-        client.push("/tmp/repo")
+        git_client.push(str(git_client.workdir))
 
 
 @pytest.mark.unit
-def test_push_git_not_found(mocker):
+def test_push_git_not_found(mocker, git_client):
     mocker.patch("subprocess.run", side_effect=OSError("git not found"))
 
-    client = GitClient(protocol="http")
     with pytest.raises(OSError):
-        client.push("/tmp/repo")
+        git_client.push(str(git_client.workdir))
