@@ -54,7 +54,7 @@ jobs:
         continue-on-error: true
         run: |
           echo "[CI] Running E2E tests..."
-          docker compose run --rm tester pytest -v \
+          docker compose run --rm tester pytest -v -p no:xdist \
             -m "e2e" \
             --alluredir=/app/allure-results/e2e tests || true
 
