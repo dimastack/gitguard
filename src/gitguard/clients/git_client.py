@@ -146,7 +146,7 @@ class GitClient:
     # Core runner 
     # -----------
     def _run(self, args: List[str], extra_env: Optional[dict] = None, cwd: Optional[str] = None,
-             timeout: Optional[float] = None) -> GitResult:
+             timeout: Optional[float] = 60) -> GitResult:
         """
         Run a git command with optional extra environment and optional cwd override.
         Returns GitResult (and allows subprocess.run to be mocked by unit tests).
