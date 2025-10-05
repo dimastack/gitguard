@@ -1,35 +1,56 @@
 import pytest
 
-from gitguard.clients.git_client import GitClient
+
+@pytest.mark.e2e
+@pytest.mark.parametrize("protocol", ["http", "ssh", "git"])
+def test_status_clean_repo(git_client, gitea_host, tmp_path, protocol):
+    """
+    Check that freshly cloned repository has a clean working tree.
+    """
+    git_client.protocol = protocol
+    git_client.host = gitea_host
+    git_client.owner = "testuser"
+    git_client.repo = "test-repo"
+    git_client.workdir = str(tmp_path)
+
+    # Clone repo
+    result = git_client.clone()
+    assert result.ok(), f"Clone failed: {result.stderr}"
+
+    repo_dir = tmp_path / "test-repo"
+    git_client.workdir = str(repo_dir)
+
+    # Check status
+    status_result = git_client.status()
+    assert status_result.ok(), f"Status command failed: {status_result.stderr}"
+    assert (
+        "nothing to commit" in status_result.stdout.lower()
+        or "clean" in status_result.stdout.lower()
+    ), f"Unexpected status output: {status_result.stdout}"
 
 
 @pytest.mark.e2e
 @pytest.mark.parametrize("protocol", ["http", "ssh", "git"])
-def test_status_clean_repo(protocol, tmp_path):
-    client = GitClient(protocol=protocol, host="localhost:3000",
-                       owner="testuser", repo="test-repo", workdir=tmp_path)
-    client.clone()
+def test_fetch_from_origin(git_client, gitea_host, tmp_path, protocol):
+    """
+    Fetch from origin should complete successfully.
+    """
+    git_client.protocol = protocol
+    git_client.host = gitea_host
+    git_client.owner = "testuser"
+    git_client.repo = "test-repo"
+    git_client.workdir = str(tmp_path)
+
+    # Clone repo
+    result = git_client.clone()
+    assert result.ok(), f"Clone failed: {result.stderr}"
 
     repo_dir = tmp_path / "test-repo"
-    client2 = GitClient(protocol=protocol, host="localhost:3000",
-                        owner="testuser", repo="test-repo", workdir=repo_dir)
+    git_client.workdir = str(repo_dir)
 
-    status_result = client2.status()
-    assert status_result.ok()
-    assert "nothing to commit" in status_result.stdout.lower() or "clean" in status_result.stdout.lower()
-
-
-@pytest.mark.e2e
-@pytest.mark.parametrize("protocol", ["http", "ssh", "git"])
-def test_fetch_from_origin(protocol, tmp_path):
-    client = GitClient(protocol=protocol, host="localhost:3000",
-                       owner="testuser", repo="test-repo", workdir=tmp_path)
-    client.clone()
-
-    repo_dir = tmp_path / "test-repo"
-    client2 = GitClient(protocol=protocol, host="localhost:3000",
-                        owner="testuser", repo="test-repo", workdir=repo_dir)
-
-    fetch_result = client2.fetch()
-    assert fetch_result.ok()
-    assert "fetch" in (fetch_result.stdout.lower() + fetch_result.stderr.lower())
+    # Fetch
+    fetch_result = git_client.fetch()
+    assert fetch_result.ok(), f"Fetch failed: {fetch_result.stderr}"
+    assert "fetch" in (
+        fetch_result.stdout.lower() + fetch_result.stderr.lower()
+    ), f"Unexpected fetch output: {fetch_result.stdout} {fetch_result.stderr}"

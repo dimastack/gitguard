@@ -1,80 +1,71 @@
 import pytest
 
-from gitguard.clients.git_client import GitClient
-
 
 @pytest.mark.unit
-def test_init_repo(mocker):
+def test_init_repo(mocker, git_client):
     mock_run = mocker.patch("subprocess.run")
     mock_run.return_value.returncode = 0
     mock_run.return_value.stdout = "Initialized empty Git repo"
     mock_run.return_value.stderr = ""
 
-    client = GitClient(protocol="http")
-    result = client.init("/tmp/repo")
+    result = git_client.init(str(git_client.workdir))
 
     assert result.returncode == 0
     assert "Initialized" in result.stdout
 
 
 @pytest.mark.unit
-def test_init_timeout(mocker):
+def test_init_timeout(mocker, git_client):
     mocker.patch("subprocess.run", side_effect=TimeoutError("init timed out"))
 
-    client = GitClient(protocol="http")
     with pytest.raises(TimeoutError):
-        client.init("/tmp/repo")
+        git_client.init(str(git_client.workdir))
 
 
 @pytest.mark.unit
-def test_init_permission_error(mocker):
+def test_init_permission_error(mocker, git_client):
     mocker.patch("subprocess.run", side_effect=PermissionError("Permission denied"))
 
-    client = GitClient(protocol="http")
     with pytest.raises(PermissionError):
-        client.init("/restricted/repo")
+        git_client.init("/restricted/repo")
 
 
 @pytest.mark.unit
-def test_checkout_branch_failure(mocker):
+def test_checkout_branch_failure(mocker, git_client):
     mock_run = mocker.patch("subprocess.run")
     mock_run.return_value.returncode = 1
     mock_run.return_value.stdout = ""
     mock_run.return_value.stderr = "error: pathspec 'nonexistent' did not match any file(s) known to git"
 
-    client = GitClient(protocol="http")
-    result = client.checkout("/tmp/repo", "nonexistent")
+    result = git_client.checkout(str(git_client.workdir), "nonexistent")
 
     assert result.returncode == 1
     assert "pathspec" in result.stderr
 
 
 @pytest.mark.unit
-def test_checkout_branch_timeout(mocker):
+def test_checkout_branch_timeout(mocker, git_client):
     mocker.patch("subprocess.run", side_effect=TimeoutError("checkout timed out"))
 
-    client = GitClient(protocol="http")
     with pytest.raises(TimeoutError):
-        client.checkout("/tmp/repo", "feature/timeout")
+        git_client.checkout(str(git_client.workdir), "feature/timeout")
 
 
-def test_checkout_oserror(mocker):
+def test_checkout_oserror(mocker, git_client):
     mocker.patch("subprocess.run", side_effect=OSError("git not found"))
 
-    client = GitClient(protocol="http")
     with pytest.raises(OSError):
-        client.checkout("/tmp/repo", "develop")
+        git_client.checkout(str(git_client.workdir), "develop")
 
 
 @pytest.mark.unit
-def test_checkout_invalid_branch(mocker):
+def test_checkout_invalid_branch(mocker, git_client):
     mock_run = mocker.patch("subprocess.run")
     mock_run.return_value.returncode = 1
     mock_run.return_value.stdout = ""
     mock_run.return_value.stderr = "fatal: invalid reference: '***'"
 
-    client = GitClient(protocol="http")
-    result = client.checkout("/tmp/repo", "***")
+    result = git_client.checkout(str(git_client.workdir), "***")
 
     assert result.returncode == 1
     assert "invalid reference" in result.stderr

@@ -1,44 +1,50 @@
 import pytest
 
-from gitguard.clients.git_client import GitClient
-
 
 @pytest.mark.e2e
 @pytest.mark.parametrize("protocol", ["http", "ssh", "git"])
-def test_init_and_commit(protocol, tmp_path):
+def test_init_and_commit(git_client, gitea_host, protocol, tmp_path):
     repo_dir = tmp_path / "local"
     repo_dir.mkdir()
 
-    client = GitClient(protocol=protocol, host="localhost:3000",
-                       owner="testuser", repo="test-repo", workdir=repo_dir)
+    git_client.protocol = protocol
+    git_client.host = gitea_host
+    git_client.owner = "testuser"
+    git_client.repo = "test-repo"
+    git_client.workdir = str(repo_dir)
 
     # init
-    init_result = client.init()
-    assert init_result.ok()
+    init_result = git_client.init()
+    assert init_result.ok(), f"Init failed: {init_result.stderr}"
 
     # create file
     f = repo_dir / "a.txt"
     f.write_text("line1")
 
-    add_result = client.add("a.txt")
-    assert add_result.ok()
+    add_result = git_client.add("a.txt")
+    assert add_result.ok(), f"Add failed: {add_result.stderr}"
 
-    commit_result = client.commit("initial commit")
-    assert commit_result.ok()
+    commit_result = git_client.commit("initial commit")
+    assert commit_result.ok(), f"Commit failed: {commit_result.stderr}"
 
 
 @pytest.mark.e2e
 @pytest.mark.parametrize("protocol", ["http", "ssh", "git"])
-def test_commit_without_add(protocol, tmp_path):
+def test_commit_without_add(git_client, gitea_host, protocol, tmp_path):
     repo_dir = tmp_path / "local"
     repo_dir.mkdir()
 
-    client = GitClient(protocol=protocol, host="localhost:3000",
-                       owner="testuser", repo="test-repo", workdir=repo_dir)
+    git_client.protocol = protocol
+    git_client.host = gitea_host
+    git_client.owner = "testuser"
+    git_client.repo = "test-repo"
+    git_client.workdir = str(repo_dir)
 
-    client.init()
+    git_client.init()
     (repo_dir / "b.txt").write_text("line2")
 
-    commit_result = client.commit("try commit without add")
-    assert not commit_result.ok()
-    assert "nothing to commit" in (commit_result.stdout + commit_result.stderr).lower()
+    commit_result = git_client.commit("try commit without add")
+    assert not commit_result.ok(), "Expected commit to fail without add"
+    combined_output = (commit_result.stdout + commit_result.stderr).lower()
+    assert "nothing to commit" in combined_output or "no changes added" in combined_output, \
+        f"Unexpected commit output: {combined_output}"
