@@ -20,6 +20,7 @@ def test_create_org(mocker, gitea_client):
     assert result["full_name"] == "testorg"
     mock_post.assert_called_once_with(
         "orgs",
-        json={"username": "testorg", "full_name": "testorg", "description": "desc"},
+        json={"full_name": "testorg", "description": "desc"},
         headers=gitea_client._auth_headers(),
     )
+
