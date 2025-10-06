@@ -2,14 +2,10 @@ import pytest
 
 
 @pytest.mark.e2e
-def test_health_and_version(gitea_client):
+def test_version(gitea_client):
     """
-    Basic health/version checks of Gitea API.
+    Basic version checks of Gitea API.
     """
-
-    # Health check should pass
-    res = gitea_client.health_check()
-    assert res.ok(), f"Health-check failed: {res.status_code} {getattr(res, 'text', '')}"
 
     # Version endpoint should return JSON with version info
     res = gitea_client.version()

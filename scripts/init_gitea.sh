@@ -8,8 +8,6 @@ ADMIN_PASS="${GITEA_ADMIN_PASSWORD:-gitadmin123}"
 ADMIN_EMAIL="${GITEA_ADMIN_EMAIL:-gitadmin@example.com}"
 TOKEN_NAME="ci-token"
 TOKEN_FILE="/data/gitea_admin_token"
-ORG_NAME="test-org"
-REPO_NAME="test-repo"
 SSH_KEY_FILE="/etc/ssh_keys/id_rsa.pub"
 
 echo "[init] Waiting for Gitea to be healthy..."
@@ -59,21 +57,6 @@ if [ -f "$SSH_KEY_FILE" ] && [ -n "$TOKEN" ]; then
     -H "Content-Type: application/json" \
     -H "Authorization: token ${TOKEN}" \
     -d "{\"title\": \"ci-key\", \"key\": \"${PUBKEY}\"}" || true
-fi
-
-# --- Create org and repo ---
-if [ -n "$TOKEN" ]; then
-  echo "[init] Creating org '${ORG_NAME}'..."
-  curl -s -X POST "${GITEA_URL}/api/v1/orgs" \
-    -H "Content-Type: application/json" \
-    -H "Authorization: token ${TOKEN}" \
-    -d "{\"username\": \"${ORG_NAME}\", \"full_name\": \"Test Organization\"}" || true
-
-  echo "[init] Creating repo '${REPO_NAME}' in org '${ORG_NAME}'..."
-  curl -s -X POST "${GITEA_URL}/api/v1/orgs/${ORG_NAME}/repos" \
-    -H "Content-Type: application/json" \
-    -H "Authorization: token ${TOKEN}" \
-    -d "{\"name\": \"${REPO_NAME}\", \"private\": false}" || true
 fi
 
 echo "[init] Initialization complete."
