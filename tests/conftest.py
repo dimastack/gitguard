@@ -2,6 +2,7 @@ import os
 import pytest
 import base64
 import logging
+import subprocess
 
 from gitguard.clients.http_gitea_client import GiteaHttpClient
 from gitguard.clients.git_client import GitClient
@@ -94,6 +95,13 @@ def setup_test_environment(gitea_client):
 #     repo_name = "test-repo"
 #     logger.info("[cleanup] Deleting repo '%s/%s'", username, repo_name)
 #     gitea_client.delete_repo(owner=username, repo=repo_name)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def setup_git_identity():
+    """Ensure git identity matches the test user created in setup_test_environment."""
+    subprocess.run(["git", "config", "--global", "user.email", "testuser@example.com"], check=False)
+    subprocess.run(["git", "config", "--global", "user.name", "testuser"], check=False)
 
 
 @pytest.fixture

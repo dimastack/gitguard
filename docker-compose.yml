@@ -28,6 +28,12 @@ services:
       - "3000:3000"
       - "2222:2222" 
       - "9418:9418"   # git:// protocol
+    command:
+      - /bin/bash
+      - -c
+      - |
+        /usr/bin/git daemon --reuseaddr --base-path=/data/git --export-all --enable=receive-pack --informative-errors &
+        /usr/bin/entrypoint
     networks:
       gitnet:
         aliases:
