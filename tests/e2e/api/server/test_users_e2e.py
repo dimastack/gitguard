@@ -24,7 +24,7 @@ def test_user_lifecycle(gitea_client):
     # Get user details
     r = gitea_client.get_user(username)
     assert r.ok(), f"Get user failed: {r.status_code} {getattr(r,'text','')}"
-    user_data = r.json()
+    user_data = r.json
     assert user_data.get("username") == username, f"Expected username '{username}', got {user_data}"
 
     # Update user email
@@ -33,12 +33,12 @@ def test_user_lifecycle(gitea_client):
     assert r.ok(), f"Edit user failed: {r.status_code} {getattr(r,'text','')}"
     r = gitea_client.get_user(username)
     assert r.ok()
-    assert r.json().get("email") == new_email, f"Email not updated: {r.json()}"
+    assert r.json.get("email") == new_email, f"Email not updated: {r.json}"
 
     # List users and confirm presence
     r = gitea_client.list_users()
     assert r.ok(), f"List users failed: {r.status_code} {getattr(r,'text','')}"
-    users = [u.get("username") for u in r.json()]
+    users = [u.get("username") for u in r.json]
     assert username in users, f"Expected {username} in user list: {users}"
 
     # Delete user

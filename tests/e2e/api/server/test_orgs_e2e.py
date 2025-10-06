@@ -27,7 +27,7 @@ def test_org_lifecycle(gitea_client):
     assert resp.ok() or resp.status_code in (409, 422), \
         f"Org creation failed: {resp.status_code} {getattr(resp, 'text', '')}"
 
-    org_data = resp.json() if resp.ok() else {}
+    org_data = resp.json if resp.ok() else {}
     if org_data:
         assert org_data.get("username") == org_name or org_data.get("full_name") == org_name, \
             f"Unexpected org data: {org_data}"
@@ -35,13 +35,13 @@ def test_org_lifecycle(gitea_client):
     # 2. List orgs for user
     resp = gitea_client.list_orgs()
     assert resp.ok(), f"List orgs failed: {resp.status_code} {getattr(resp, 'text', '')}"
-    orgs = [o.get("username") or o.get("full_name") for o in resp.json()]
+    orgs = [o.get("username") or o.get("full_name") for o in resp.json]
     assert org_name in orgs, f"Expected {org_name} in {orgs}"
 
     # 3. Fetch org details
     resp = gitea_client.get_org(org_name)
     assert resp.ok(), f"Get org failed: {resp.status_code} {getattr(resp, 'text', '')}"
-    org_info = resp.json()
+    org_info = resp.json
     assert org_info.get("username") == org_name or org_info.get("full_name") == org_name, \
         f"Unexpected org info: {org_info}"
 
@@ -53,8 +53,8 @@ def test_org_lifecycle(gitea_client):
     # Verify update
     resp = gitea_client.get_org(org_name)
     assert resp.ok(), f"Failed to re-fetch org after edit: {resp.status_code}"
-    assert resp.json().get("description") == new_description, \
-        f"Org description not updated: {resp.json()}"
+    assert resp.json.get("description") == new_description, \
+        f"Org description not updated: {resp.json}"
 
 
 @pytest.mark.e2e

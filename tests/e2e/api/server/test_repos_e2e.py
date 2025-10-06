@@ -25,14 +25,14 @@ def test_repo_lifecycle(gitea_client):
     # Create repository
     r = gitea_client.create_repo(name=repo_name, owner=username, private=False, description="Initial repo")
     assert r.ok() or r.status_code == 409, f"Repo creation failed: {r.status_code} {getattr(r,'text','')}"
-    repo_data = r.json() if r.ok() else {}
+    repo_data = r.json if r.ok() else {}
     if r.ok():
         assert repo_data.get("name") == repo_name, f"Unexpected repo data: {repo_data}"
 
     # Get repository details
     r = gitea_client.get_repo(owner=username, repo=repo_name)
     assert r.ok(), f"Get repo failed: {r.status_code} {getattr(r,'text','')}"
-    repo_info = r.json()
+    repo_info = r.json
     assert repo_info.get("name") == repo_name, f"Repo name mismatch: {repo_info}"
     assert repo_info.get("owner", {}).get("username") == username, \
         f"Repo owner mismatch: {repo_info.get('owner')}"
@@ -43,12 +43,12 @@ def test_repo_lifecycle(gitea_client):
     assert r.ok(), f"Edit repo failed: {r.status_code} {getattr(r,'text','')}"
     r = gitea_client.get_repo(owner=username, repo=repo_name)
     assert r.ok(), f"Get after edit failed: {r.status_code}"
-    assert r.json().get("description") == new_description, f"Repo description not updated: {r.json()}"
+    assert r.json.get("description") == new_description, f"Repo description not updated: {r.json}"
 
     # List repositories for user
     r = gitea_client.list_user_repos(username)
     assert r.ok(), f"List user repos failed: {r.status_code} {getattr(r,'text','')}"
-    repos = [repo.get("name") for repo in r.json()]
+    repos = [repo.get("name") for repo in r.json]
     assert repo_name in repos, f"Expected repo '{repo_name}' in list: {repos}"
 
     # Delete repository
