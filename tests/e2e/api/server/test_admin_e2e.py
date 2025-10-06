@@ -23,14 +23,14 @@ def test_admin_create_edit_delete_user(gitea_client):
     # 2. Verify in list_users
     users = gitea_client.list_users()
     assert users.ok(), f"List users failed: {users.status_code} {users.text}"
-    usernames = [u["username"] for u in users.json()]
+    usernames = [u["username"] for u in users.json]
     assert username in usernames, f"Expected {username} in {usernames}"
 
     # 3. Edit user email
     new_email = "admin_updated@example.com"
     resp = gitea_client.edit_user(username, email=new_email)
     assert resp.ok(), f"Edit user failed: {resp.status_code} {resp.text}"
-    user_data = gitea_client.get_user(username).json()
+    user_data = gitea_client.get_user(username).json
     assert user_data["email"] == new_email, f"Email not updated, got {user_data}"
 
     # 4. Delete user
@@ -65,13 +65,13 @@ def test_admin_create_repo_for_user(gitea_client):
     resp = gitea_client.admin_create_repo(username=username, repo_name=repo_name)
     assert resp.ok() or resp.status_code == 409, f"Repo creation failed: {resp.status_code} {resp.text}"
     if resp.ok():
-        repo_data = resp.json()
+        repo_data = resp.json
         assert repo_data["name"] == repo_name, f"Unexpected repo name: {repo_data}"
 
     # 3. Fetch repo
     resp = gitea_client.get_repo(owner=username, repo=repo_name)
     assert resp.ok(), f"Fetch repo failed: {resp.status_code} {resp.text}"
-    repo_data = resp.json()
+    repo_data = resp.json
     assert repo_data["name"] == repo_name, f"Expected repo {repo_name}, got {repo_data}"
 
 
@@ -80,7 +80,7 @@ def test_admin_list_unadopted_repos(gitea_client):
     """Admin unadopted repos endpoint should return valid JSON."""
     resp = gitea_client.list_unadopted_repos()
     assert resp.ok(), f"List unadopted repos failed: {resp.status_code} {resp.text}"
-    data = resp.json()
+    data = resp.json
     assert isinstance(data, list), f"Expected list, got {type(data)}"
 
 

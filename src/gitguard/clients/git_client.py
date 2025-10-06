@@ -103,10 +103,10 @@ class GitClient:
             return f"{proto}://{h}:{port}/{repo_path}"
         if proto == "git":
             port = 9418
-            return f"git://{h}:{port}/{repo_path}"
+            return f"{proto}://{h}:{port}/{repo_path}"
         if proto == "ssh":
             port = 2222
-            return f"git@{h}:{port}:{repo_path}"
+            return f"{proto}://git@{h}:{port}/{repo_path}"
         raise ValueError(f"Unsupported protocol '{proto}'")
 
     def _write_log_header(self, cmd: List[str], env: dict, duration: float, rc: int, stdout: str, stderr: str) -> None:
@@ -165,7 +165,8 @@ class GitClient:
         if self.enable_trace:
             env.setdefault("GIT_TRACE", "1")
             env.setdefault("GIT_CURL_VERBOSE", "1")
-            env.setdefault("GIT_SSH_COMMAND", "ssh -v")
+            env.setdefault("GIT_SSH_COMMAND", 
+                           "ssh -v -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null")
 
         # determine working directory
         run_cwd = str(self.workdir) if cwd is None else str(Path(cwd))

@@ -10,7 +10,7 @@ def test_version(gitea_client):
     # Version endpoint should return JSON with version info
     res = gitea_client.version()
     assert res.ok(), f"Version endpoint failed: {res.status_code} {getattr(res, 'text', '')}"
-    data = res.json()
+    data = res.json
     assert isinstance(data, dict), f"Version response must be JSON object, got: {type(data)}"
     assert any(k in data for k in ("version", "tag_name", "sha", "version_tag")), \
         f"Unexpected version payload: {data}"
@@ -36,7 +36,7 @@ def test_repo_rename_and_delete(gitea_client):
     # Create repo under the user
     resp = gitea_client.create_repo(original_repo, private=False, description="misc repo")
     assert resp.ok(), f"Repo creation failed: {resp.status_code} {getattr(resp, 'text', '')}"
-    repo_data = resp.json()
+    repo_data = resp.json
     assert repo_data.get("name") == original_repo or repo_data.get("full_name", "").endswith(original_repo), \
         f"Unexpected repo data after create: {repo_data}"
 
@@ -51,7 +51,7 @@ def test_repo_rename_and_delete(gitea_client):
     # Verify new repo exists
     r_new = gitea_client.get_repo(owner=username, repo=renamed_repo)
     assert r_new.ok(), f"Renamed repo not found: {r_new.status_code} {getattr(r_new, 'text', '')}"
-    data = r_new.json()
+    data = r_new.json
     assert data.get("name") == renamed_repo or data.get("full_name", "").endswith(renamed_repo)
 
     # Delete repo
@@ -73,7 +73,7 @@ def test_list_unadopted_and_adopt_negative(gitea_client):
     # List unadopted repos (should succeed)
     resp = gitea_client.list_unadopted_repos()
     assert resp.ok(), f"List unadopted repos failed: {resp.status_code} {getattr(resp, 'text', '')}"
-    data = resp.json()
+    data = resp.json
     assert isinstance(data, list), f"Unadopted repos endpoint must return list, got {type(data)}"
 
     # Negative: adopt non-existing repo -> expect 4xx failure
