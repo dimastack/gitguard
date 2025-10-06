@@ -20,9 +20,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and start Gitea
+      - name: Cleanup old containers and images
         run: |
-          docker compose build --no-cache
+          docker compose down -v --remove-orphans || true
+          docker system prune -af || true
+
+      - name: Build containers and start Gitea
+        run: |
+          docker compose build --no-cache tester gitea
           docker compose up -d gitea
 
       - name: Wait for Gitea to become ready
