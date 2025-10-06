@@ -6,9 +6,10 @@ import time
 import datetime
 import logging
 import shlex
+
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Tuple, List, Dict, Any
+from typing import Optional, List
 
 try:
     import allure
@@ -98,11 +99,14 @@ class GitClient:
         repo_path = f"{o}/{r}.git"
 
         if proto in ("http", "https"):
-            return f"{proto}://{h}/{repo_path}"
+            port = 3000 if proto == "http" else 443
+            return f"{proto}://{h}:{port}/{repo_path}"
         if proto == "git":
-            return f"git://{h}/{repo_path}"
+            port = 9418
+            return f"git://{h}:{port}/{repo_path}"
         if proto == "ssh":
-            return f"git@{h}:{repo_path}"
+            port = 2222
+            return f"git@{h}:{port}:{repo_path}"
         raise ValueError(f"Unsupported protocol '{proto}'")
 
     def _write_log_header(self, cmd: List[str], env: dict, duration: float, rc: int, stdout: str, stderr: str) -> None:
